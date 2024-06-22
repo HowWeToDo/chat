@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
     let listener = TcpListener::bind(&addr).await?;
     info!("Listening on {}", addr);
 
-    let app = get_router(config);
+    let app = get_router(config).await?;
 
     axum::serve(listener, app).await?;
 
