@@ -48,3 +48,18 @@ Authorization: Bearer {{token}}
 ### get user list
 GET http://localhost:6688/api/users
 Authorization: Bearer {{token}}
+
+### upload files
+POST http://localhost:6688/api/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=MyBoundary
+
+--MyBoundary
+Content-Disposition: from-data; filename="hello.txt"
+
+Hello, World!
+--MyBoundary--
+
+### get files
+GET http://localhost:6688/api/files/1/0a0/a9f/2a6772942557ab5355d76af442f8f65e01.txt
+Authorization: Bearer {{token}}
