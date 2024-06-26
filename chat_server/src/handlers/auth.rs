@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{AppError, ErrorOutput},
-    AppState, CreateUser, SignisUser, User,
+    AppState, CreateUser, SigninUser, User,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -23,7 +23,7 @@ pub(crate) async fn signup_handler(
 
 pub(crate) async fn signin_handler(
     State(state): State<AppState>,
-    Json(input): Json<SignisUser>,
+    Json(input): Json<SigninUser>,
 ) -> Result<impl IntoResponse, AppError> {
     let user = User::verify(&input, &state.pool).await?;
 
@@ -51,7 +51,7 @@ mod tests {
     async fn signup_should_work() -> Result<()> {
         let config = AppConfig::load()?;
         let (_tdb, state) = AppState::new_for_test(config).await?;
-        let input = CreateUser::new("Tyr Chen", "tchen@acme.org", "hunter42");
+        let input = CreateUser::new("none", "Tyr Chen", "tchen@acme.org", "hunter42");
         let res = signup_handler(State(state), Json(input))
             .await?
             .into_response();
@@ -66,7 +66,7 @@ mod tests {
     async fn signup_duplicate_user_should_409() -> Result<()> {
         let config = AppConfig::load()?;
         let (_tdb, state) = AppState::new_for_test(config).await?;
-        let input = CreateUser::new("Tyr Chen", "tchen@acme.org", "hunter42");
+        let input = CreateUser::new("none", "Tyr Chen", "tchen@acme.org", "hunter42");
         signup_handler(State(state.clone()), Json(input.clone())).await?;
         let res = signup_handler(State(state.clone()), Json(input.clone()))
             .await
@@ -82,9 +82,9 @@ mod tests {
     async fn signin_should_work() -> Result<()> {
         let config = AppConfig::load()?;
         let (_tdb, state) = AppState::new_for_test(config).await?;
-        let user = CreateUser::new("Alice", "alice@acme.org", "Hunter42");
+        let user = CreateUser::new("none", "Alice", "alice@acme.org", "Hunter42");
         User::create(&user, &state.pool).await?;
-        let input = SignisUser::new(&user.email, &user.password);
+        let input = SigninUser::new(&user.email, &user.password);
         let res = signin_handler(State(state), Json(input))
             .await?
             .into_response();
@@ -101,7 +101,7 @@ mod tests {
         let (_tdb, state) = AppState::new_for_test(config).await?;
         let email = "alice@acme.org";
         let password = "Hunter42";
-        let input = SignisUser::new(email, password);
+        let input = SigninUser::new(email, password);
         let res = signin_handler(State(state), Json(input))
             .await
             .into_response();
