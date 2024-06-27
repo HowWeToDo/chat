@@ -51,7 +51,7 @@ mod tests {
     async fn signup_should_work() -> Result<()> {
         let config = AppConfig::load()?;
         let (_tdb, state) = AppState::new_for_test(config).await?;
-        let input = CreateUser::new("none", "Tyr Chen", "tchen@acme.org", "hunter42");
+        let input = CreateUser::new("acme", "Tian Chen", "tyr@acme.org", "123456");
         let res = signup_handler(State(state), Json(input))
             .await?
             .into_response();
@@ -66,9 +66,9 @@ mod tests {
     async fn signup_duplicate_user_should_409() -> Result<()> {
         let config = AppConfig::load()?;
         let (_tdb, state) = AppState::new_for_test(config).await?;
-        let input = CreateUser::new("none", "Tyr Chen", "tchen@acme.org", "hunter42");
-        signup_handler(State(state.clone()), Json(input.clone())).await?;
-        let res = signup_handler(State(state.clone()), Json(input.clone()))
+        let input = CreateUser::new("acme", "Tyr Chen", "tchen@acme.org", "123456");
+
+        let res = signup_handler(State(state), Json(input))
             .await
             .into_response();
         assert_eq!(res.status(), StatusCode::CONFLICT);
@@ -82,9 +82,9 @@ mod tests {
     async fn signin_should_work() -> Result<()> {
         let config = AppConfig::load()?;
         let (_tdb, state) = AppState::new_for_test(config).await?;
-        let user = CreateUser::new("none", "Alice", "alice@acme.org", "Hunter42");
-        User::create(&user, &state.pool).await?;
-        let input = SigninUser::new(&user.email, &user.password);
+        let email = "tchen@acme.org";
+        let password = "123456";
+        let input = SigninUser::new(email, password);
         let res = signin_handler(State(state), Json(input))
             .await?
             .into_response();
@@ -99,8 +99,8 @@ mod tests {
     async fn signin_with_non_exists_user_should_403() -> Result<()> {
         let config = AppConfig::load()?;
         let (_tdb, state) = AppState::new_for_test(config).await?;
-        let email = "alice@acme.org";
-        let password = "Hunter42";
+        let email = "tchen1@acme.org";
+        let password = "123456";
         let input = SigninUser::new(email, password);
         let res = signin_handler(State(state), Json(input))
             .await

@@ -1,47 +1,47 @@
 -- Add migration script here
-
 -- create user table
-create table if not exists users (
-    id bigserial  primary key,
-    fullname varchar(64) not null,
-    email varchar(64) not null,
-    -- hashed argon2 password'len 97
-    password_hash varchar(97) not null,
-    created_at timestamptz default current_timestamp
+CREATE TABLE IF NOT EXISTS users(
+  id bigserial PRIMARY KEY,
+  fullname varchar(64) NOT NULL,
+  email varchar(64) NOT NULL,
+  -- hashed argon2 password, length 97
+  password_hash varchar(97) NOT NULL,
+  created_at timestamptz DEFAULT CURRENT_TIMESTAMP
 );
 
 -- create index for users for email
-create unique index if not exists email_index on users(email);
+CREATE UNIQUE INDEX IF NOT EXISTS email_index ON users(email);
 
--- create chat type: signal, group, private_channel, pubilc_channel
-create type chat_type as enum ('single', 'group', 'private_channel', 'pubilc_channel');
+-- create chat type: single, group, private_channel, public_channel
+CREATE TYPE chat_type AS ENUM(
+  'single',
+  'group',
+  'private_channel',
+  'public_channel'
+);
 
 -- create chat table
-create table if not exists chats (
-    id bigserial primary key,
-    name varchar(128) not null unique,
-    type chat_type not null,
-    -- user id list,
-    members bigint[] not null,
-    created_at timestamptz default current_timestamp
+CREATE TABLE IF NOT EXISTS chats(
+  id bigserial PRIMARY KEY,
+  name varchar(64),
+  type chat_type NOT NULL,
+  -- user id list
+  members bigint[] NOT NULL,
+  created_at timestamptz DEFAULT CURRENT_TIMESTAMP
 );
 
 -- create message table
-create table if not exists messages (
-    id bigserial  primary key,
-    chat_id bigint not null,
-    sender_id bigint not null,
-    content text not null,
-    images text[],
-    created_at timestamptz default current_timestamp,
-
-    foreign key (chat_id) references chats(id),
-    foreign key (sender_id) references users(id)
-
+CREATE TABLE IF NOT EXISTS messages(
+  id bigserial PRIMARY KEY,
+  chat_id bigint NOT NULL REFERENCES chats(id),
+  sender_id bigint NOT NULL REFERENCES users(id),
+  content text NOT NULL,
+  images text[],
+  created_at timestamptz DEFAULT CURRENT_TIMESTAMP
 );
 
--- create index for message for chat_id
-create index if not exists chat_id_created_at_index on messages(chat_id, created_at desc);
+-- create index for messages for chat_id and created_at order by created_at desc
+CREATE INDEX IF NOT EXISTS chat_id_created_at_index ON messages(chat_id, created_at DESC);
 
 -- create index for messages for sender_id
-create index if not exists sender_id_index on messages(sender_id, created_at desc);
+CREATE INDEX IF NOT EXISTS sender_id_index ON messages(sender_id, created_at DESC);
