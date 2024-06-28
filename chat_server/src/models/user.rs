@@ -1,3 +1,5 @@
+use std::mem;
+
 use crate::{error::AppError, ChatUser, User, Workspace};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
@@ -6,7 +8,6 @@ use argon2::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::mem;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateUser {
@@ -94,9 +95,32 @@ impl User {
 }
 
 impl ChatUser {
-    // pub async fn fetch_all(user: &User, pool: &PgPool) -> Result<Vec<ChatUser>, AppError> {
-
-    // }
+    pub async fn fetch_by_ids(ids: &[i64], pool: &PgPool) -> Result<Vec<Self>, AppError> {
+        let users = sqlx::query_as(
+            "
+            SELECT id, fullname, email
+            FROM users
+            WHERE id = ANY($1)
+            ",
+        )
+        .bind(ids)
+        .fetch_all(pool)
+        .await?;
+        Ok(users)
+    }
+    pub async fn fetch_all(ws_id: u64, pool: &PgPool) -> Result<Vec<ChatUser>, AppError> {
+        let users = sqlx::query_as(
+            "
+            SELECT id, fullname, email
+            FROM users
+            WHERE ws_id = $1
+        ",
+        )
+        .bind(ws_id as i64)
+        .fetch_all(pool)
+        .await?;
+        Ok(users)
+    }
 }
 
 fn hash_password(password: &str) -> Result<String, AppError> {
