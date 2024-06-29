@@ -1,13 +1,12 @@
 use std::mem;
 
-use crate::{error::AppError, ChatUser, User, Workspace};
+use crate::{error::AppError, AppState, ChatUser, User};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateUser {
@@ -23,30 +22,30 @@ pub struct SigninUser {
     pub password: String,
 }
 
-impl User {
+impl AppState {
     // Find a user by email
-    pub async fn find_by_email(email: &str, pool: &PgPool) -> Result<Option<Self>, AppError> {
+    pub async fn find_user_by_email(&self, email: &str) -> Result<Option<User>, AppError> {
         let user = sqlx::query_as(
             "SELECT id, ws_id, fullname, email, created_at FROM users WHERE email = $1",
         )
         .bind(email)
-        .fetch_optional(pool)
+        .fetch_optional(&self.pool)
         .await?;
         Ok(user)
     }
 
     // Create a new user
-    pub async fn create(input: &CreateUser, pool: &PgPool) -> Result<Self, AppError> {
+    pub async fn create_user(&self, input: &CreateUser) -> Result<User, AppError> {
         // check if email exists
-        let user = Self::find_by_email(&input.email, pool).await?;
+        let user = self.find_user_by_email(&input.email).await?;
         if user.is_some() {
             return Err(AppError::EmailAlreadyExists(input.email.clone()));
         }
 
         // check if workspace exists if not create one
-        let ws = match Workspace::find_by_name(&input.workspace, pool).await? {
+        let ws = match self.find_workspace_by_name(&input.workspace).await? {
             Some(ws) => ws,
-            None => Workspace::create(&input.workspace, 0, pool).await?,
+            None => self.create_workspace(&input.workspace, 0).await?,
         };
         let password_hash = hash_password(&input.password)?;
         let user: User = sqlx::query_as(
@@ -60,23 +59,23 @@ impl User {
         .bind(&input.email)
         .bind(&input.fullname)
         .bind(password_hash)
-        .fetch_one(pool)
+        .fetch_one(&self.pool)
         .await?;
 
         if ws.owner_id == 0 {
-            ws.update_owner(user.id as _, pool).await?;
+            ws.update_owner(user.id as _, &self.pool).await?;
         }
 
         Ok(user)
     }
 
     // Verify email and password
-    pub async fn verify(input: &SigninUser, pool: &PgPool) -> Result<Option<Self>, AppError> {
+    pub async fn verify_user(&self, input: &SigninUser) -> Result<Option<User>, AppError> {
         let user: Option<User> = sqlx::query_as(
             "SELECT id, ws_id, fullname, email, password_hash, created_at FROM users WHERE email = $1",
         )
         .bind(&input.email)
-        .fetch_optional(pool)
+        .fetch_optional(&self.pool)
         .await?;
         match user {
             Some(mut user) => {
@@ -92,10 +91,8 @@ impl User {
             None => Ok(None),
         }
     }
-}
 
-impl ChatUser {
-    pub async fn fetch_by_ids(ids: &[i64], pool: &PgPool) -> Result<Vec<Self>, AppError> {
+    pub async fn fetch_chat_user_by_ids(&self, ids: &[i64]) -> Result<Vec<ChatUser>, AppError> {
         let users = sqlx::query_as(
             "
             SELECT id, fullname, email
@@ -104,11 +101,11 @@ impl ChatUser {
             ",
         )
         .bind(ids)
-        .fetch_all(pool)
+        .fetch_all(&self.pool)
         .await?;
         Ok(users)
     }
-    pub async fn fetch_all(ws_id: u64, pool: &PgPool) -> Result<Vec<ChatUser>, AppError> {
+    pub async fn fetch_chat_users(&self, ws_id: u64) -> Result<Vec<ChatUser>, AppError> {
         let users = sqlx::query_as(
             "
             SELECT id, fullname, email
@@ -117,7 +114,7 @@ impl ChatUser {
         ",
         )
         .bind(ws_id as i64)
-        .fetch_all(pool)
+        .fetch_all(&self.pool)
         .await?;
         Ok(users)
     }
@@ -187,7 +184,6 @@ impl SigninUser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::get_test_pool;
     use anyhow::Result;
 
     #[test]
@@ -201,10 +197,10 @@ mod tests {
 
     #[tokio::test]
     async fn create_duplicate_user_should_fail() -> Result<()> {
-        let (_tdb, pool) = get_test_pool(None).await;
+        let (_tdb, state) = AppState::new_for_test().await?;
 
         let input = CreateUser::new("acme", "Tyr Chen", "tchen@acme.org", "hunter42");
-        let res = User::create(&input, &pool).await;
+        let res = state.create_user(&input).await;
         match res {
             Err(AppError::EmailAlreadyExists(email)) => {
                 assert_eq!(email, input.email);
@@ -216,18 +212,19 @@ mod tests {
 
     #[tokio::test]
     async fn create_and_verify_user_should_work() -> Result<()> {
-        let (_tdb, pool) = get_test_pool(None).await;
+        let (_tdb, state) = AppState::new_for_test().await?;
+
         let ws = "none";
         let email = "tyr@acme.org";
         let fullname = "Tian Chen";
         let password = "hunter42";
         let input = CreateUser::new(ws, fullname, email, password);
-        let user = User::create(&input, &pool).await?;
+        let user = state.create_user(&input).await?;
         assert_eq!(user.email, email);
         assert_eq!(user.fullname, fullname);
         assert!(user.id > 0);
 
-        let user = User::find_by_email(email, &pool).await?;
+        let user = state.find_user_by_email(email).await?;
         assert!(user.is_some());
         let user = user.unwrap();
         assert_eq!(user.email, email);
@@ -235,7 +232,7 @@ mod tests {
 
         let input = SigninUser::new(email, password);
 
-        let user = User::verify(&input, &pool).await?;
+        let user = state.verify_user(&input).await?;
         assert!(user.is_some());
 
         Ok(())
