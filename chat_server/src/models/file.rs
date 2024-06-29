@@ -3,9 +3,8 @@ use std::{
     str::FromStr,
 };
 
+use crate::{AppError, ChatFile};
 use sha1::{Digest, Sha1};
-
-use crate::{error::AppError, ChatFile};
 
 impl ChatFile {
     pub fn new(ws_id: u64, filename: &str, data: &[u8]) -> Self {
@@ -18,7 +17,7 @@ impl ChatFile {
     }
 
     pub fn url(&self) -> String {
-        format!("/files/{}/{}", self.ws_id, self.hash_to_path())
+        format!("/files/{}", self.hash_to_path())
     }
 
     pub fn path(&self, base_dir: &Path) -> PathBuf {
@@ -36,23 +35,26 @@ impl ChatFile {
 impl FromStr for ChatFile {
     type Err = AppError;
 
-    // convert files
+    // convert /files/s/339/807/e635afbeab088ce33206fdf4223a6bb156.png to ChatFile
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let Some(s) = s.strip_prefix("/files") else {
-            return Err(AppError::ChatFileError(
-                "Invalid chat file path".to_string(),
-            ));
+        let Some(s) = s.strip_prefix("/files/") else {
+            return Err(AppError::ChatFileError(format!(
+                "Invalid chat file path: {}",
+                s
+            )));
         };
+
         let parts: Vec<&str> = s.split('/').collect();
         if parts.len() != 4 {
-            return Err(AppError::ChatFileError(
-                "File path doesn't valid".to_string(),
-            ));
-        };
+            return Err(AppError::ChatFileError(format!(
+                "File path {} does not valid",
+                s
+            )));
+        }
 
         let Ok(ws_id) = parts[0].parse::<u64>() else {
             return Err(AppError::ChatFileError(format!(
-                "Invalid worksapce id: {}",
+                "Invalid workspace id: {}",
                 parts[1]
             )));
         };
@@ -79,9 +81,9 @@ mod tests {
 
     #[test]
     fn chat_file_new_should_work() {
-        let file = ChatFile::new(1, "test.txt", b"hello");
+        let file = ChatFile::new(1, "test.txt", b"hello world");
         assert_eq!(file.ws_id, 1);
         assert_eq!(file.ext, "txt");
-        assert_eq!(file.hash, "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d");
+        assert_eq!(file.hash, "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed");
     }
 }

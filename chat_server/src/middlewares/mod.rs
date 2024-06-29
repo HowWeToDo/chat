@@ -1,4 +1,5 @@
 mod auth;
+mod chat;
 mod request_id;
 mod server_time;
 
@@ -12,6 +13,7 @@ use tower_http::{
 use tracing::Level;
 
 pub use auth::verify_token;
+pub use chat::verify_chat;
 use request_id::set_request_id;
 
 pub const REQUEST_ID_HEADER: &str = "x-request-id";
