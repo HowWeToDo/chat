@@ -1,4 +1,4 @@
-use crate::{error::AppError, User};
+use crate::User;
 use jwt_simple::prelude::*;
 
 const JWT_DURATION: u64 = 60 * 60 * 24 * 7;
@@ -9,24 +9,24 @@ pub struct EncodingKey(Ed25519KeyPair);
 pub struct DecodingKey(Ed25519PublicKey);
 
 impl EncodingKey {
-    pub fn load(pem: &str) -> Result<Self, AppError> {
+    pub fn load(pem: &str) -> Result<Self, jwt_simple::Error> {
         Ok(Self(Ed25519KeyPair::from_pem(pem)?))
     }
 
-    pub fn sign(&self, user: impl Into<User>) -> Result<String, AppError> {
+    pub fn sign(&self, user: impl Into<User>) -> Result<String, jwt_simple::Error> {
         let clamis = Claims::with_custom_claims(user.into(), Duration::from_secs(JWT_DURATION));
         let clamis = clamis.with_issuer(JWT_ISSUER).with_audience(JWT_AUDIENCE);
-        Ok(self.0.sign(clamis)?)
+        self.0.sign(clamis)
     }
 }
 
 impl DecodingKey {
-    pub fn load(pem: &str) -> Result<Self, AppError> {
+    pub fn load(pem: &str) -> Result<Self, jwt_simple::Error> {
         Ok(Self(Ed25519PublicKey::from_pem(pem)?))
     }
 
     #[allow(unused)]
-    pub fn verify(&self, token: &str) -> Result<User, AppError> {
+    pub fn verify(&self, token: &str) -> Result<User, jwt_simple::Error> {
         let opts = VerificationOptions {
             allowed_issuers: Some(HashSet::from_strings(&[JWT_ISSUER])),
             allowed_audiences: Some(HashSet::from_strings(&[JWT_AUDIENCE])),

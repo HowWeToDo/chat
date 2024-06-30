@@ -1,5 +1,5 @@
 use anyhow::Result;
-use notify_server::get_router;
+use notify_server::{get_router, setup_pg_listener};
 use tokio::net::TcpListener;
 use tracing::info;
 use tracing_subscriber::{
@@ -12,6 +12,8 @@ async fn main() -> Result<()> {
     tracing_subscriber::registry().with(layer).init();
 
     let addr = "127.0.0.1:6687";
+
+    setup_pg_listener().await?;
 
     let listener = TcpListener::bind(&addr).await?;
     info!("Listening on {}", addr);
