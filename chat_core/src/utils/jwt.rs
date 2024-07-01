@@ -6,6 +6,7 @@ const JWT_ISSUER: &str = "chat_server";
 const JWT_AUDIENCE: &str = "chat_web";
 
 pub struct EncodingKey(Ed25519KeyPair);
+
 pub struct DecodingKey(Ed25519PublicKey);
 
 impl EncodingKey {

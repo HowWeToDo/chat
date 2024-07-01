@@ -13,12 +13,12 @@ async fn main() -> Result<()> {
 
     let addr = "127.0.0.1:6687";
 
-    setup_pg_listener().await?;
+    let (app, state) = get_router();
+
+    setup_pg_listener(state).await?;
 
     let listener = TcpListener::bind(&addr).await?;
     info!("Listening on {}", addr);
-
-    let app = get_router();
 
     axum::serve(listener, app).await?;
 
